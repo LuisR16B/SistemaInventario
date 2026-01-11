@@ -61,7 +61,22 @@ def obtener_usuario(nombre, password_intento):
     finally:
         conn.close()
 
-# --- GESTIÓN DE PRODUCTOS CON PAGINACIÓN ---
+# --- GESTIÓN DE PRODUCTOS (BUSQUEDA, INSERCIÓN Y ACTUALIZACIÓN) ---
+
+def buscar_productos(usuario_id, texto):
+    """Busca productos por nombre o código de barras (Máximo 5 resultados)."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        # Buscamos coincidencias parciales en nombre o código
+        query = """SELECT * FROM productos 
+                   WHERE usuario_id = ? AND (nombre_producto LIKE ? OR codigo_barra LIKE ?) 
+                   LIMIT 5"""
+        cursor.execute(query, (usuario_id, f"%{texto}%", f"%{texto}%"))
+        return cursor.fetchall()
+    finally:
+        conn.close()
 
 def insertar_producto(datos):
     """Inserta un nuevo producto."""
@@ -81,8 +96,32 @@ def insertar_producto(datos):
     finally:
         conn.close()
 
+def actualizar_producto(id_producto, datos_tupla):
+    """
+    Actualiza datos de un producto. 
+    IMPORTANTE: Suma el stock nuevo al existente (cantidad = cantidad + ?)
+    """
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        # datos_tupla trae: (cod, nombre, costo, porc, venta, cantidad_a_sumar, marca, cat)
+        query = '''UPDATE productos SET 
+                   codigo_barra=?, nombre_producto=?, precio_costo=?, 
+                   porcentaje=?, precio_venta=?, cantidad = cantidad + ?, 
+                   marca_producto=?, categoria=? 
+                   WHERE id = ?'''
+        cursor.execute(query, datos_tupla + (id_producto,))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error al actualizar producto: {e}")
+        return False
+    finally:
+        conn.close()
+
+# --- FUNCIONES DE INVENTARIO (PAGINACIÓN) ---
+
 def obtener_productos_paginados(usuario_id, pagina_actual, productos_por_pagina=10):
-    """Retorna los productos de un usuario usando LIMIT y OFFSET."""
     offset = (pagina_actual - 1) * productos_por_pagina
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -97,7 +136,6 @@ def obtener_productos_paginados(usuario_id, pagina_actual, productos_por_pagina=
         conn.close()
 
 def contar_total_productos(usuario_id):
-    """Retorna el número total de productos para calcular el número de páginas."""
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -108,19 +146,17 @@ def contar_total_productos(usuario_id):
         conn.close()
 
 # --- SCRIPT PARA CONSOLA ---
-# Ejecuta este archivo directamente: python data/database.py
 if __name__ == "__main__":
     inicializar_db()
     print("\n--- REGISTRO DE USUARIOS POR CONSOLA ---")
     user = input("Nuevo usuario: ")
     pw = input("Contraseña: ")
-    
     hash_pw = generate_password_hash(pw)
     try:
         db = sqlite3.connect(DB_PATH)
         db.execute("INSERT INTO usuarios (usuario_nombre, contrasenha) VALUES (?,?)", (user, hash_pw))
         db.commit()
         db.close()
-        print(f"\nExito: Usuario '{user}' creado correctamente.")
+        print(f"\nExito: Usuario '{user}' creado.")
     except Exception as e:
-        print(f"\nError: El usuario ya existe o hubo un problema: {e}")
+        print(f"\nError: {e}")

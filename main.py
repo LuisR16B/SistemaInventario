@@ -2,8 +2,8 @@ import flet as ft
 import asyncio
 from data.database import inicializar_db
 from views.login_view import login_view
-# Importamos la nueva vista que creamos
 from views.agregar_producto_view import agregar_producto_view
+from views.inventario_view import inventario_view
 
 async def main(page: ft.Page):
     page.window.maximized = True
@@ -16,21 +16,21 @@ async def main(page: ft.Page):
     inicializar_db()
 
     # Variable para rastrear la sección activa
-    page.selected_menu = "Inventario"
+    page.selected_menu = "Agregar Producto"
 
-    # Contenedor dinámico principal (Lado derecho)
+    # Contenedor dinámico principal
     content_area = ft.Container(
         expand=True,
         padding=30,
         bgcolor="#F4F6F7",
-        content=ft.Text("Iniciando...", color="black")
+        content=ft.Text("Cargando módulo...", color="black")
     )
 
     async def show_login():
         page.controls.clear()
         page.add(
             ft.Container(
-                content=login_view(page, on_login_success=show_inventario),
+                content=login_view(page, on_login_success=show_panel_principal),
                 alignment=ft.Alignment(0, 0),
                 expand=True
             )
@@ -41,26 +41,20 @@ async def main(page: ft.Page):
         page.selected_menu = nombre_seccion
         actualizar_sidebar()
         
-        # Lógica de enrutamiento a las vistas
         if nombre_seccion == "Agregar Producto":
             content_area.content = agregar_producto_view(page)
         elif nombre_seccion == "Inventario":
-            # Aquí irá la vista de inventario con paginación
-            content_area.content = ft.Column([
-                ft.Text(nombre_seccion, size=30, weight="bold", color="#004d40"),
-                ft.Text("Módulo de inventario en desarrollo...", color="black54")
-            ])
+            content_area.content = inventario_view(page)
         else:
             content_area.content = ft.Column([
-                ft.Text(nombre_seccion, size=30, weight="bold", color="#004d40"),
-                ft.Divider(color="black12"),
-                ft.Text(f"Sección de {nombre_seccion} lista para programar.", color="black54")
+                ft.Text(nombre_seccion, size=28, weight="bold", color="#00332a"),
+                ft.Divider(color="#00332a"),
+                ft.Text(f"El módulo de {nombre_seccion} está en desarrollo.", color="black", size=16)
             ])
         
         page.update()
 
     def build_menu_button(texto):
-        """Crea los botones de la barra lateral con el diseño de la captura."""
         is_selected = page.selected_menu == texto
         return ft.Container(
             content=ft.Text(texto, color="white", size=15, weight=ft.FontWeight.W_500),
@@ -73,27 +67,35 @@ async def main(page: ft.Page):
             ink=True,
         )
 
-    # Columna que aloja los botones del menú
     rail = ft.Column(spacing=0)
 
     def actualizar_sidebar():
         secciones = ["Agregar Producto", "Inventario", "Crear Factura", "Historial", "Finanzas"]
         rail.controls = [build_menu_button(s) for s in secciones]
 
-    async def show_inventario():
+    async def show_panel_principal():
         u_name = getattr(page, "user_name", "Usuario")
         page.controls.clear()
 
-        # Cargar botones iniciales
         actualizar_sidebar()
 
+        # Corrección del error 'color' en TextButton usando ft.ButtonStyle
         app_bar = ft.AppBar(
             title=ft.Text(f"STOCKSMART - {u_name.upper()}", weight="bold", color="white"),
             bgcolor="#00332a",
-            actions=[ft.TextButton("SALIR", on_click=lambda _: logout_task())]
+            center_title=False,
+            actions=[
+                ft.Container(
+                    content=ft.TextButton(
+                        "CERRAR SESIÓN", 
+                        on_click=lambda _: logout_task(),
+                        style=ft.ButtonStyle(color="white") # Forma correcta en versiones nuevas
+                    ),
+                    padding=ft.Padding(right=20, top=0, left=0, bottom=0)
+                )
+            ]
         )
 
-        # Contenedor de la barra lateral (Verde oscuro)
         rail_container = ft.Container(
             content=rail,
             width=220,
@@ -110,18 +112,15 @@ async def main(page: ft.Page):
             spacing=0,
         )
 
-        # Mostrar "Agregar Producto" por defecto al entrar
+        # Cargar la vista por defecto
         content_area.content = agregar_producto_view(page)
-        page.selected_menu = "Agregar Producto"
-        actualizar_sidebar()
-
+        
         page.add(app_bar, layout)
         page.update()
 
     def logout_task():
         asyncio.create_task(show_login())
 
-    # Iniciar con el Login
     await show_login()
 
 if __name__ == "__main__":
