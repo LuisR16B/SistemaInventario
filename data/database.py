@@ -5,7 +5,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 DB_PATH = os.path.join("database", "sistema_ventas.db")
 
 def inicializar_db():
-    """Crea las tablas de Usuarios y Productos actualizadas."""
+    """Crea las tablas de Usuarios y Productos con la nueva lógica de costos."""
     if not os.path.exists("database"):
         os.makedirs("database")
 
@@ -21,18 +21,20 @@ def inicializar_db():
         )
     ''')
 
-    # 2. TABLA PRODUCTOS (Sin IVA y conectada al Usuario)
+    # 2. TABLA PRODUCTOS (Actualizada con transporte y unidades por caja)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS productos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             usuario_id INTEGER NOT NULL,
             codigo_barra TEXT,
             nombre_producto TEXT NOT NULL,
-            unidades TEXT,
-            precio_costo REAL,
-            porcentaje REAL,
-            precio_venta REAL,
-            cantidad INTEGER DEFAULT 0,
+            unidades_por_caja INTEGER DEFAULT 1,
+            precio_costo REAL DEFAULT 0,
+            porcentaje_transporte REAL DEFAULT 0,
+            precio_costo_total REAL DEFAULT 0,
+            porcentaje_venta REAL DEFAULT 0,
+            precio_venta REAL DEFAULT 0,
+            cantidad_unidades INTEGER DEFAULT 0,
             marca_producto TEXT,
             categoria TEXT,
             FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
@@ -61,15 +63,14 @@ def obtener_usuario(nombre, password_intento):
     finally:
         conn.close()
 
-# --- GESTIÓN DE PRODUCTOS (BUSQUEDA, INSERCIÓN Y ACTUALIZACIÓN) ---
+# --- GESTIÓN DE PRODUCTOS ---
 
 def buscar_productos(usuario_id, texto):
-    """Busca productos por nombre o código de barras (Máximo 5 resultados)."""
+    """Busca productos por nombre o código (Máximo 5)."""
     try:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        # Buscamos coincidencias parciales en nombre o código
         query = """SELECT * FROM productos 
                    WHERE usuario_id = ? AND (nombre_producto LIKE ? OR codigo_barra LIKE ?) 
                    LIMIT 5"""
@@ -79,47 +80,43 @@ def buscar_productos(usuario_id, texto):
         conn.close()
 
 def insertar_producto(datos):
-    """Inserta un nuevo producto."""
+    """Inserta un nuevo producto con 12 parámetros."""
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         query = '''INSERT INTO productos 
-                   (usuario_id, codigo_barra, nombre_producto, unidades, precio_costo, 
-                    porcentaje, precio_venta, cantidad, marca_producto, categoria) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'''
+                   (usuario_id, codigo_barra, nombre_producto, unidades_por_caja, 
+                    precio_costo, porcentaje_transporte, precio_costo_total, 
+                    porcentaje_venta, precio_venta, cantidad_unidades, marca_producto, categoria) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'''
         cursor.execute(query, datos)
         conn.commit()
         return True
     except Exception as e:
-        print(f"Error al insertar producto: {e}")
+        print(f"Error al insertar: {e}")
         return False
     finally:
         conn.close()
 
 def actualizar_producto(id_producto, datos_tupla):
-    """
-    Actualiza datos de un producto. 
-    IMPORTANTE: Suma el stock nuevo al existente (cantidad = cantidad + ?)
-    """
+    """Actualiza y suma unidades al stock existente."""
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        # datos_tupla trae: (cod, nombre, costo, porc, venta, cantidad_a_sumar, marca, cat)
         query = '''UPDATE productos SET 
-                   codigo_barra=?, nombre_producto=?, precio_costo=?, 
-                   porcentaje=?, precio_venta=?, cantidad = cantidad + ?, 
+                   codigo_barra=?, nombre_producto=?, unidades_por_caja=?, 
+                   precio_costo=?, porcentaje_transporte=?, precio_costo_total=?, 
+                   porcentaje_venta=?, precio_venta=?, cantidad_unidades = cantidad_unidades + ?, 
                    marca_producto=?, categoria=? 
                    WHERE id = ?'''
         cursor.execute(query, datos_tupla + (id_producto,))
         conn.commit()
         return True
     except Exception as e:
-        print(f"Error al actualizar producto: {e}")
+        print(f"Error al actualizar: {e}")
         return False
     finally:
         conn.close()
-
-# --- FUNCIONES DE INVENTARIO (PAGINACIÓN) ---
 
 def obtener_productos_paginados(usuario_id, pagina_actual, productos_por_pagina=10):
     offset = (pagina_actual - 1) * productos_por_pagina
@@ -140,23 +137,33 @@ def contar_total_productos(usuario_id):
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM productos WHERE usuario_id = ?", (usuario_id,))
-        total = cursor.fetchone()[0]
-        return total
+        return cursor.fetchone()[0]
     finally:
         conn.close()
 
-# --- SCRIPT PARA CONSOLA ---
+# --- SECCIÓN PARA EJECUTAR POR CONSOLA ---
 if __name__ == "__main__":
     inicializar_db()
-    print("\n--- REGISTRO DE USUARIOS POR CONSOLA ---")
-    user = input("Nuevo usuario: ")
-    pw = input("Contraseña: ")
-    hash_pw = generate_password_hash(pw)
-    try:
-        db = sqlite3.connect(DB_PATH)
-        db.execute("INSERT INTO usuarios (usuario_nombre, contrasenha) VALUES (?,?)", (user, hash_pw))
-        db.commit()
-        db.close()
-        print(f"\nExito: Usuario '{user}' creado.")
-    except Exception as e:
-        print(f"\nError: {e}")
+    print("\n" + "="*40)
+    print("SISTEMA DE GESTIÓN - REGISTRO DE USUARIOS")
+    print("="*40)
+    
+    user = input("Nombre de usuario nuevo: ").strip()
+    if not user:
+        print("Error: El usuario no puede estar vacío.")
+    else:
+        pw = input(f"Contraseña para {user}: ").strip()
+        if len(pw) < 4:
+            print("Error: La contraseña debe tener al menos 4 caracteres.")
+        else:
+            hash_pw = generate_password_hash(pw)
+            try:
+                db = sqlite3.connect(DB_PATH)
+                db.execute("INSERT INTO usuarios (usuario_nombre, contrasenha) VALUES (?,?)", (user, hash_pw))
+                db.commit()
+                db.close()
+                print(f"\n[ÉXITO]: Usuario '{user}' creado correctamente.")
+            except sqlite3.IntegrityError:
+                print(f"\n[ERROR]: El usuario '{user}' ya existe.")
+            except Exception as e:
+                print(f"\n[ERROR]: {e}")
