@@ -18,6 +18,20 @@ def agregar_producto_view(page: ft.Page):
     txt_codigo = ft.TextField(label="Código de Barras", **estilo_campo)
     txt_nombre = ft.TextField(label="Nombre del Producto", expand=True, **estilo_campo)
     
+    # --- DROPDOWN DE CATEGORÍAS (Cambio solicitado) ---
+    drop_categoria = ft.Dropdown(
+        label="Categoría",
+        **estilo_campo,
+        options=[
+            ft.dropdown.Option("Papelería"),
+            ft.dropdown.Option("Alimentos"),
+            ft.dropdown.Option("Bebidas"),
+            ft.dropdown.Option("Limpieza"),
+            ft.dropdown.Option("Otros"), # Agregué 'Otros' por si acaso
+        ],
+        width=300,
+    )
+
     # --- LÓGICA DE CÁLCULO DE UNIDADES ---
     def calcular_unidades_totales(e):
         try:
@@ -42,7 +56,6 @@ def agregar_producto_view(page: ft.Page):
             p_venta = float(txt_p_venta.value or 0)
             venta_final = float(txt_venta_final.value or 0)
 
-            # 1. Lógica para COSTO TOTAL / TRANSPORTE
             if e.control in [txt_costo_base, txt_p_transporte]:
                 costo_total = costo_base + (costo_base * (p_transporte / 100))
                 txt_costo_total.value = str(round(costo_total, 2))
@@ -54,10 +67,8 @@ def agregar_producto_view(page: ft.Page):
                 else:
                     txt_p_transporte.value = "0"
 
-            # Re-leer costo_total actualizado para los siguientes cálculos
             costo_total = float(txt_costo_total.value or 0)
 
-            # 2. Lógica para VENTA FINAL / GANANCIA
             if e.control in [txt_p_venta, txt_costo_base, txt_p_transporte, txt_costo_total]:
                 venta_final = costo_total + (costo_total * (p_venta / 100))
                 txt_venta_final.value = str(round(venta_final, 2))
@@ -75,14 +86,11 @@ def agregar_producto_view(page: ft.Page):
 
     txt_costo_base = ft.TextField(label="Precio Costo", value="0", on_change=recalcular_precios, **estilo_campo)
     txt_p_transporte = ft.TextField(label="% Transporte", value="0", on_change=recalcular_precios, **estilo_campo)
-    
-    # Estos campos ya NO son read_only
     txt_costo_total = ft.TextField(label="Costo Total", value="0", on_change=recalcular_precios, bgcolor="#E8F5E9", **estilo_campo)
     txt_p_venta = ft.TextField(label="% Ganancia Venta", value="0", on_change=recalcular_precios, **estilo_campo)
     txt_venta_final = ft.TextField(label="Precio Venta Final", value="0", on_change=recalcular_precios, **estilo_campo)
     
     txt_marca = ft.TextField(label="Marca", **estilo_campo)
-    txt_categoria = ft.TextField(label="Categoría", **estilo_campo)
 
     lista_resultados = ft.ListView(expand=True, spacing=10, padding=10)
 
@@ -102,7 +110,9 @@ def agregar_producto_view(page: ft.Page):
         txt_cajas_recibidas.value = "0"
         txt_unidades_nuevas.value = "0"
         txt_marca.value = str(prod['marca_producto'] or "")
-        txt_categoria.value = str(prod['categoria'] or "")
+        
+        # Asignar valor al Dropdown de categoría
+        drop_categoria.value = str(prod['categoria']) if prod['categoria'] else None
         
         container_principal.content = layout_formulario
         page.update()
@@ -139,11 +149,17 @@ def agregar_producto_view(page: ft.Page):
             return
         
         datos_db = (
-            txt_codigo.value, txt_nombre.value, int(txt_unidades_caja.value or 1),
-            float(txt_costo_base.value or 0), float(txt_p_transporte.value or 0),
-            float(txt_costo_total.value or 0), float(txt_p_venta.value or 0),
-            float(txt_venta_final.value or 0), int(txt_unidades_nuevas.value or 0),
-            txt_marca.value, txt_categoria.value
+            txt_codigo.value, 
+            txt_nombre.value, 
+            int(txt_unidades_caja.value or 1),
+            float(txt_costo_base.value or 0), 
+            float(txt_p_transporte.value or 0),
+            float(txt_costo_total.value or 0), 
+            float(txt_p_venta.value or 0),
+            float(txt_venta_final.value or 0), 
+            int(txt_unidades_nuevas.value or 0),
+            txt_marca.value, 
+            drop_categoria.value # Usamos el valor del Dropdown
         )
         
         if producto_seleccionado_id:
@@ -172,7 +188,7 @@ def agregar_producto_view(page: ft.Page):
                 on_click=lambda _: seleccionar_para_editar({
                     'id':None, 'codigo_barra':'', 'nombre_producto':'', 'unidades_por_caja':1,
                     'precio_costo':0, 'porcentaje_transporte':0, 'precio_costo_total':0, 
-                    'porcentaje_venta':0, 'precio_venta':0, 'marca_producto':'', 'categoria':''
+                    'porcentaje_venta':0, 'precio_venta':0, 'marca_producto':'', 'categoria':None
                 }))
         ]),
         ft.Container(
@@ -195,9 +211,8 @@ def agregar_producto_view(page: ft.Page):
         ]),
         ft.Divider(color="black12"),
         ft.Row([txt_codigo, txt_nombre]),
-        ft.Row([txt_marca, txt_categoria]),
+        ft.Row([txt_marca, drop_categoria]), # Aquí se visualiza el nuevo Dropdown
         
-        # SECCIÓN DE INVENTARIO
         ft.Container(
             content=ft.Column([
                 ft.Text("Gestión de Unidades y Cajas", weight="bold", color="#004d40", size=16),
@@ -206,7 +221,6 @@ def agregar_producto_view(page: ft.Page):
             padding=10, bgcolor="#f9f9f9", border_radius=10
         ),
         
-        # SECCIÓN DE COSTOS (Actualizada)
         ft.Container(
             content=ft.Column([
                 ft.Text("Costos y Ganancias", weight="bold", color="#004d40", size=16),

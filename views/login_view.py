@@ -3,8 +3,10 @@ from data.database import obtener_usuario
 
 def login_view(page: ft.Page, on_login_success):
     
+    # Fondo de la pantalla (Verde)
+    page.bgcolor = "#00897b"
+    
     async def btn_entrar_click(e):
-        # Validación básica de campos vacíos
         if not txt_user.value or not txt_pass.value:
             mostrar_mensaje("Por favor, llena todos los campos")
             return
@@ -14,46 +16,69 @@ def login_view(page: ft.Page, on_login_success):
         if user:
             page.user_id = user["id"]
             page.user_name = user.get("nombre", txt_user.value)
+            page.bgcolor = "white"
             await on_login_success()
         else:
-            # Si las credenciales fallan, ahora sí verás el mensaje
             mostrar_mensaje("Usuario o contraseña incorrectos")
 
     def mostrar_mensaje(texto):
-        """Función auxiliar para mostrar el SnackBar correctamente."""
         snack = ft.SnackBar(ft.Text(texto))
-        # En versiones modernas, page.snack_bar es un shortcut, 
-        # pero abrirlo manualmente es más seguro:
         page.overlay.append(snack)
         snack.open = True
         page.update()
 
-    # --- UI Limpia ---
-    txt_user = ft.TextField(label="Usuario", width=300)
+    # --- UI ---
+    # Aumentamos un poco el ancho de los campos para que luzcan mejor en el cuadro grande
+    txt_user = ft.TextField(
+        label="Usuario", 
+        width=350,
+        color="black",
+        border_color="#00897b"
+    )
+    
     txt_pass = ft.TextField(
         label="Contraseña", 
         password=True, 
         can_reveal_password=True, 
-        width=300,
-        on_submit=btn_entrar_click # Permite dar 'Enter' para entrar
+        width=350,
+        color="black",
+        border_color="#00897b",
+        on_submit=btn_entrar_click 
     )
     
-    btn_principal = ft.ElevatedButton("ENTRAR", on_click=btn_entrar_click, width=300)
+    btn_principal = ft.ElevatedButton(
+        "ENTRAR", 
+        on_click=btn_entrar_click, 
+        width=350,
+        height=50, # Botón un poco más alto
+        bgcolor="#00897b",
+        color="white"
+    )
 
-    return ft.Card(
-        content=ft.Container(
-            padding=30,
-            content=ft.Column(
-                horizontal_alignment="center",
-                controls=[
-                    ft.Text("INICIO DE SESIÓN", size=25, weight="bold"),
-                    ft.Divider(height=20),
-                    txt_user,
-                    txt_pass,
-                    ft.Container(height=10), # Espaciador
-                    btn_principal,
-                ],
-                tight=True
+    return ft.Container(
+        content=ft.Card(
+            bgcolor="white",
+            elevation=15, # Un poco más de sombra para resaltar el tamaño
+            content=ft.Container(
+                padding=60,      # Más espacio interno
+                width=500,       # Ancho aumentado (antes 380)
+                height=600,      # Alto aumentado para que sea un cuadrado grande
+                content=ft.Column(
+                    horizontal_alignment="center",
+                    alignment=ft.MainAxisAlignment.CENTER, # Centra el contenido verticalmente
+                    controls=[
+                        ft.Text("INICIO DE SESIÓN", size=30, weight="bold", color="black"),
+                        ft.Divider(height=40, color="black12"),
+                        txt_user,
+                        ft.Container(height=10), # Espacio entre campos
+                        txt_pass,
+                        ft.Container(height=30), # Espacio antes del botón
+                        btn_principal,
+                    ],
+                    tight=True
+                )
             )
-        )
+        ),
+        expand=True,
+        alignment=ft.Alignment(0, 0) 
     )

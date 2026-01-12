@@ -82,7 +82,7 @@ async def main(page: ft.Page):
         # Corrección del error 'color' en TextButton usando ft.ButtonStyle
         app_bar = ft.AppBar(
             title=ft.Text(f"ZAMORA 77 - {u_name.upper()}", weight="bold", color="white"),
-            bgcolor="#001033",
+            bgcolor="#00332a",
             center_title=False,
             actions=[
                 ft.Container(
