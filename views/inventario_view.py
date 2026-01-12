@@ -81,7 +81,7 @@ def inventario_view(page: ft.Page):
     
     drop_categoria = ft.Dropdown(
         label="Categoría", width=200, value="Todos", **estilo_campo,
-        options=[ft.dropdown.Option("Todos"), ft.dropdown.Option("Papelería"), ft.dropdown.Option("Alimentos"), ft.dropdown.Option("Bebidas"), ft.dropdown.Option("Limpieza")]
+        options=[ft.dropdown.Option("Todos"), ft.dropdown.Option("Papelería"), ft.dropdown.Option("Bisutería"), ft.dropdown.Option("Hogar"), ft.dropdown.Option("Confitería"), ft.dropdown.Option("Plásticos"), ft.dropdown.Option("Quincallería"), ft.dropdown.Option("Dulces"),]
     )
     drop_categoria.on_change = ejecutar_filtro
 

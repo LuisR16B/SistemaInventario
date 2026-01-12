@@ -24,9 +24,12 @@ def agregar_producto_view(page: ft.Page):
         **estilo_campo,
         options=[
             ft.dropdown.Option("Papelería"),
-            ft.dropdown.Option("Alimentos"),
-            ft.dropdown.Option("Bebidas"),
-            ft.dropdown.Option("Limpieza"),
+            ft.dropdown.Option("Bisutería"),
+            ft.dropdown.Option("Hogar"),
+            ft.dropdown.Option("Confitería"),
+            ft.dropdown.Option("Plásticos"),
+            ft.dropdown.Option("Quincallería"),
+            ft.dropdown.Option("Dulces"),
             ft.dropdown.Option("Otros"), # Agregué 'Otros' por si acaso
         ],
         width=300,
