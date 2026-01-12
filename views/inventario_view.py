@@ -72,7 +72,7 @@ def inventario_view(page: ft.Page):
                     ])
                 )
 
-            txt_info_paginacion.value = f"Página {state['pagina']} de {max(1, total_paginas)} (Total: {total_prods})"
+            txt_info_paginacion.value = f"Página {state['pagina']} de {max(1, total_paginas)} (Total productos registrados: {total_prods})"
             btn_prev.disabled = state["pagina"] == 1
             btn_next.disabled = state["pagina"] >= total_paginas
             
@@ -128,7 +128,7 @@ def inventario_view(page: ft.Page):
             ft.DataColumn(ft.Text("MARCA", color="white", weight="bold")),
             ft.DataColumn(ft.Text("COSTO TOTAL", color="white", weight="bold")),
             ft.DataColumn(ft.Text("PRECIO VENTA", color="white", weight="bold")),
-            ft.DataColumn(ft.Text("STOCK", color="white", weight="bold")),
+            ft.DataColumn(ft.Text("UNIDADES", color="white", weight="bold")),
         ],
     )
 

@@ -7,7 +7,7 @@ from views.inventario_view import inventario_view
 
 async def main(page: ft.Page):
     page.window.maximized = True
-    page.title = "StockSmart Pro"
+    page.title = "ZAMORA 77"
     page.theme_mode = ft.ThemeMode.DARK
     page.padding = 0
     page.spacing = 0
@@ -81,8 +81,8 @@ async def main(page: ft.Page):
 
         # Corrección del error 'color' en TextButton usando ft.ButtonStyle
         app_bar = ft.AppBar(
-            title=ft.Text(f"STOCKSMART - {u_name.upper()}", weight="bold", color="white"),
-            bgcolor="#00332a",
+            title=ft.Text(f"ZAMORA 77 - {u_name.upper()}", weight="bold", color="white"),
+            bgcolor="#001033",
             center_title=False,
             actions=[
                 ft.Container(
