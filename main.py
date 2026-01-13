@@ -4,6 +4,9 @@ from data.database import inicializar_db
 from views.login_view import login_view
 from views.agregar_producto_view import agregar_producto_view
 from views.inventario_view import inventario_view
+from views.factura_view import factura_view 
+# 1. Importamos la nueva vista de historial
+from views.historial_view import historial_view 
 
 async def main(page: ft.Page):
     page.window.maximized = True
@@ -41,10 +44,16 @@ async def main(page: ft.Page):
         page.selected_menu = nombre_seccion
         actualizar_sidebar()
         
+        # --- LÓGICA DE NAVEGACIÓN ACTUALIZADA ---
         if nombre_seccion == "Agregar Producto":
             content_area.content = agregar_producto_view(page)
         elif nombre_seccion == "Inventario":
             content_area.content = inventario_view(page)
+        elif nombre_seccion == "Crear Factura":
+            content_area.content = factura_view(page)
+        # 2. Agregamos la condición para el Historial
+        elif nombre_seccion == "Historial":
+            content_area.content = historial_view(page)
         else:
             content_area.content = ft.Column([
                 ft.Text(nombre_seccion, size=28, weight="bold", color="#00332a"),
@@ -70,6 +79,7 @@ async def main(page: ft.Page):
     rail = ft.Column(spacing=0)
 
     def actualizar_sidebar():
+        # Aquí definimos el orden de los botones del menú lateral
         secciones = ["Agregar Producto", "Inventario", "Crear Factura", "Historial", "Finanzas"]
         rail.controls = [build_menu_button(s) for s in secciones]
 
@@ -79,7 +89,6 @@ async def main(page: ft.Page):
 
         actualizar_sidebar()
 
-        # Corrección del error 'color' en TextButton usando ft.ButtonStyle
         app_bar = ft.AppBar(
             title=ft.Text(f"ZAMORA 77 - {u_name.upper()}", weight="bold", color="white"),
             bgcolor="#00332a",
@@ -89,7 +98,7 @@ async def main(page: ft.Page):
                     content=ft.TextButton(
                         "CERRAR SESIÓN", 
                         on_click=lambda _: logout_task(),
-                        style=ft.ButtonStyle(color="white") # Forma correcta en versiones nuevas
+                        style=ft.ButtonStyle(color="white")
                     ),
                     padding=ft.Padding(right=20, top=0, left=0, bottom=0)
                 )
