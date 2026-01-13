@@ -81,15 +81,36 @@ def inicializar_db():
             producto_id INTEGER NOT NULL,
             cantidad INTEGER NOT NULL,
             precio_unitario REAL NOT NULL,
+            tipo TEXT NOT NULL,
             FOREIGN KEY (factura_id) REFERENCES facturas (id) ON DELETE CASCADE,
             FOREIGN KEY (producto_id) REFERENCES productos (id)
         )
     ''')
     
+    # --- OPTIMIZACIÓN ---
+    # Índice para acelerar la carga del historial y la paginación
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_facturas_paginacion ON facturas (usuario_id, estado, id DESC)')
+    
     conn.commit()
     conn.close()
 
 # --- GESTIÓN DE USUARIOS ---
+
+def crear_usuario(nombre, password):
+    """Crea un nuevo usuario con la contraseña encriptada."""
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        pass_hash = generate_password_hash(password)
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO usuarios (usuario_nombre, contrasenha) VALUES (?, ?)", (nombre, pass_hash))
+        conn.commit()
+        print(f"\n✅ Usuario '{nombre}' creado exitosamente.")
+        return True
+    except sqlite3.IntegrityError:
+        print(f"\n❌ Error: El usuario '{nombre}' ya existe.")
+        return False
+    finally:
+        conn.close()
 
 def obtener_usuario(nombre, password_intento):
     try:
@@ -106,7 +127,7 @@ def obtener_usuario(nombre, password_intento):
     finally:
         conn.close()
 
-# --- GESTIÓN DE PRODUCTOS (LAS QUE FALTABAN) ---
+# --- GESTIÓN DE PRODUCTOS ---
 
 def buscar_productos(usuario_id, texto):
     try:
@@ -120,15 +141,14 @@ def buscar_productos(usuario_id, texto):
         conn.close()
 
 def insertar_producto(datos):
-    """Inserta un nuevo producto. 'datos' debe ser una tupla con todos los campos."""
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         query = '''INSERT INTO productos 
-                   (usuario_id, codigo_barra, nombre_producto, unidades_por_caja, 
-                    precio_costo, porcentaje_transporte, precio_costo_total, 
-                    porcentaje_venta, precio_venta, cantidad_unidades, marca_producto, categoria) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'''
+                    (usuario_id, codigo_barra, nombre_producto, unidades_por_caja, 
+                     precio_costo, porcentaje_transporte, precio_costo_total, 
+                     porcentaje_venta, precio_venta, cantidad_unidades, marca_producto, categoria) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'''
         cursor.execute(query, datos)
         conn.commit()
         return True
@@ -139,16 +159,15 @@ def insertar_producto(datos):
         conn.close()
 
 def actualizar_producto(id_producto, datos_tupla):
-    """Actualiza un producto existente y suma el stock nuevo."""
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         query = '''UPDATE productos SET 
-                   codigo_barra=?, nombre_producto=?, unidades_por_caja=?, 
-                   precio_costo=?, porcentaje_transporte=?, precio_costo_total=?, 
-                   porcentaje_venta=?, precio_venta=?, cantidad_unidades = cantidad_unidades + ?, 
-                   marca_producto=?, categoria=? 
-                   WHERE id = ?'''
+                    codigo_barra=?, nombre_producto=?, unidades_por_caja=?, 
+                    precio_costo=?, porcentaje_transporte=?, precio_costo_total=?, 
+                    porcentaje_venta=?, precio_venta=?, cantidad_unidades = cantidad_unidades + ?, 
+                    marca_producto=?, categoria=? 
+                    WHERE id = ?'''
         cursor.execute(query, datos_tupla + (id_producto,))
         conn.commit()
         return True
@@ -172,10 +191,12 @@ def buscar_cliente_por_rif(usuario_id, texto):
         conn.close()
 
 def guardar_factura_completa(usuario_id, datos_cliente, productos_carrito, monto_total):
+    conn = None
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         
+        # 1. Buscar o Crear Cliente
         cursor.execute("SELECT id FROM clientes WHERE usuario_id = ? AND cedula_rif = ?", 
                         (usuario_id, datos_cliente['cedula_rif']))
         cliente = cursor.fetchone()
@@ -190,61 +211,77 @@ def guardar_factura_completa(usuario_id, datos_cliente, productos_carrito, monto
                             datos_cliente['direccion'], datos_cliente['zona'], datos_cliente.get('email')))
             cliente_id = cursor.lastrowid
 
-        num_fact = f"FAC-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        # 2. Generación de Fechas y Número de Factura
         fecha_actual = datetime.now()
         fecha_vence = fecha_actual + timedelta(days=8)
-        
         str_emision = fecha_actual.strftime("%d-%m-%Y")
         str_vence = fecha_vence.strftime("%d-%m-%Y")
 
         cursor.execute('''INSERT INTO facturas (usuario_id, cliente_id, numero_factura, fecha_emision, fecha_vencimiento, monto_total, estado) 
                           VALUES (?, ?, ?, ?, ?, ?, ?)''', 
-                       (usuario_id, cliente_id, num_fact, str_emision, str_vence, monto_total, 'En Proceso'))
+                       (usuario_id, cliente_id, "TEMP", str_emision, str_vence, monto_total, 'En Proceso'))
+        
         factura_id = cursor.lastrowid
+        num_fact_formateado = f"{factura_id:08d}"
+        
+        cursor.execute("UPDATE facturas SET numero_factura = ? WHERE id = ?", (num_fact_formateado, factura_id))
 
+        # 3. Detalles y Actualización de Stock
         for p in productos_carrito:
-            cursor.execute('''INSERT INTO factura_detalles (factura_id, producto_id, cantidad, precio_unitario) 
-                              VALUES (?, ?, ?, ?)''', (factura_id, p['id'], p['cantidad'], p['precio']))
+            cursor.execute('''INSERT INTO factura_detalles (factura_id, producto_id, cantidad, precio_unitario, tipo) 
+                              VALUES (?, ?, ?, ?, ?)''', 
+                           (factura_id, p['id'], p['cantidad'], p['precio_unitario'], p['tipo']))
+            
             cursor.execute("UPDATE productos SET cantidad_unidades = cantidad_unidades - ? WHERE id = ?", 
-                            (p['cantidad'], p['id']))
+                            (p['unidades_totales'], p['id']))
 
         conn.commit()
-        return {"success": True, "numero_factura": num_fact, "fecha_emision": str_emision, "fecha_vencimiento": str_vence}
+        return {
+            "success": True, 
+            "numero_factura": num_fact_formateado, 
+            "fecha_emision": str_emision, 
+            "fecha_vencimiento": str_vence
+        }
     except Exception as e:
         if conn: conn.rollback()
-        return {"success": False}
+        print(f"Error DB: {e}")
+        return {"success": False, "error": str(e)}
     finally:
         if conn: conn.close()
 
-# --- BLOQUE DE REGISTRO POR CONSOLA ---
+# --- INTERFAZ DE CONSOLA ---
 
 if __name__ == "__main__":
     inicializar_db()
-    print("\n" + "="*50)
-    print("   SISTEMA DE VENTAS - GESTIÓN DE USUARIOS")
-    print("="*50)
-    
-    opcion = input("\n¿Deseas crear un nuevo usuario? (s/n): ").lower()
-    
-    if opcion == 's':
-        user = input("Nombre de usuario: ").strip()
-        if not user:
-            print("[Error]: El nombre no puede estar vacío.")
-        else:
-            pw = input(f"Contraseña para '{user}': ").strip()
-            if len(pw) < 4:
-                print("[Error]: La contraseña debe tener al menos 4 caracteres.")
+    while True:
+        print("\n=== PANEL DE CONTROL DE BASE DE DATOS ===")
+        print("1. Agregar nuevo usuario")
+        print("2. Listar usuarios existentes")
+        print("3. Salir")
+        
+        opcion = input("\nSeleccione una opción: ").strip()
+        
+        if opcion == '1':
+            u = input("Nombre de usuario deseado: ").strip()
+            p = input("Contraseña para el usuario: ").strip()
+            if u and p:
+                crear_usuario(u, p)
             else:
-                hash_pw = generate_password_hash(pw)
-                try:
-                    db = sqlite3.connect(DB_PATH)
-                    db.execute("INSERT INTO usuarios (usuario_nombre, contrasenha) VALUES (?,?)", (user, hash_pw))
-                    db.commit()
-                    db.close()
-                    print(f"\n[ÉXITO]: El usuario '{user}' ha sido registrado correctamente.")
-                except sqlite3.IntegrityError:
-                    print(f"\n[ERROR]: El nombre de usuario '{user}' ya está en uso.")
-                except Exception as e:
-                    print(f"\n[ERROR]: {e}")
-    else:
-        print("\nCerrando gestión de usuarios. Ejecuta main.py para iniciar la App.")
+                print("⚠️ Error: Los campos no pueden estar vacíos.")
+        
+        elif opcion == '2':
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, usuario_nombre FROM usuarios")
+            usuarios = cursor.fetchall()
+            print("\n--- Usuarios en el Sistema ---")
+            for user in usuarios:
+                print(f"ID: {user[0]} | Nombre: {user[1]}")
+            conn.close()
+        
+        elif opcion == '3':
+            print("Cerrando panel...")
+            break
+        
+        else:
+            print("Opción no válida.")

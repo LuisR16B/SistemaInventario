@@ -18,89 +18,97 @@ def agregar_producto_view(page: ft.Page):
     txt_codigo = ft.TextField(label="Código de Barras", **estilo_campo)
     txt_nombre = ft.TextField(label="Nombre del Producto", expand=True, **estilo_campo)
     
-    # --- DROPDOWN DE CATEGORÍAS (Cambio solicitado) ---
     drop_categoria = ft.Dropdown(
         label="Categoría",
         **estilo_campo,
         options=[
-            ft.dropdown.Option("Papelería"),
-            ft.dropdown.Option("Bisutería"),
-            ft.dropdown.Option("Hogar"),
-            ft.dropdown.Option("Confitería"),
-            ft.dropdown.Option("Plásticos"),
-            ft.dropdown.Option("Quincallería"),
-            ft.dropdown.Option("Dulces"),
-            ft.dropdown.Option("Otros"), # Agregué 'Otros' por si acaso
+            ft.dropdown.Option("Papelería"), ft.dropdown.Option("Bisutería"),
+            ft.dropdown.Option("Hogar"), ft.dropdown.Option("Confitería"),
+            ft.dropdown.Option("Plásticos"), ft.dropdown.Option("Quincallería"),
+            ft.dropdown.Option("Dulces"), ft.dropdown.Option("Otros"),
         ],
         width=300,
     )
 
-    # --- LÓGICA DE CÁLCULO DE UNIDADES ---
-    def calcular_unidades_totales(e):
-        try:
-            cajas = int(txt_cajas_recibidas.value if txt_cajas_recibidas.value else 0)
-            u_por_caja = int(txt_unidades_caja.value if txt_unidades_caja.value else 1)
-            txt_unidades_nuevas.value = str(cajas * u_por_caja)
-            page.update()
-        except ValueError:
-            txt_unidades_nuevas.value = "0"
-            page.update()
-
-    txt_unidades_caja = ft.TextField(label="Unidades por Caja", value="1", width=180, on_change=calcular_unidades_totales, **estilo_campo)
-    txt_cajas_recibidas = ft.TextField(label="Cantidad de Cajas", value="0", width=180, on_change=calcular_unidades_totales, **estilo_campo)
-    txt_unidades_nuevas = ft.TextField(label="Total Unidades a Cargar", value="0", read_only=True, width=220, bgcolor="#f0f0f0", **estilo_campo)
-
-    # --- LÓGICA DE PRECIOS BIDIRECCIONAL ---
+    # --- LÓGICA DE PRECIOS ---
     def recalcular_precios(e):
         try:
+            costo_caja = float(txt_costo_por_caja.value or 0)
+            u_caja = int(txt_unidades_caja.value or 1)
+            
+            # Cálculo de costo base con redondeo estricto a 2 decimales
+            if costo_caja > 0:
+                txt_costo_base.value = str(round(costo_caja / u_caja, 2))
+            
             costo_base = float(txt_costo_base.value or 0)
             p_transporte = float(txt_p_transporte.value or 0)
-            costo_total = float(txt_costo_total.value or 0)
-            p_venta = float(txt_p_venta.value or 0)
-            venta_final = float(txt_venta_final.value or 0)
-
-            if e.control in [txt_costo_base, txt_p_transporte]:
+            
+            # 1. Calcular Costo Total (Redondeado)
+            if e.control in [txt_costo_base, txt_p_transporte, txt_costo_por_caja, txt_unidades_caja]:
                 costo_total = costo_base + (costo_base * (p_transporte / 100))
                 txt_costo_total.value = str(round(costo_total, 2))
             
             elif e.control == txt_costo_total:
+                costo_total = float(txt_costo_total.value or 0)
                 if costo_base > 0:
                     p_transporte = ((costo_total - costo_base) / costo_base) * 100
                     txt_p_transporte.value = str(round(p_transporte, 2))
-                else:
-                    txt_p_transporte.value = "0"
 
+            # 2. Calcular Venta Final (Redondeado)
             costo_total = float(txt_costo_total.value or 0)
-
-            if e.control in [txt_p_venta, txt_costo_base, txt_p_transporte, txt_costo_total]:
+            p_venta = float(txt_p_venta.value or 0)
+            
+            if e.control in [txt_p_venta, txt_costo_base, txt_p_transporte, txt_costo_total, txt_costo_por_caja, txt_unidades_caja]:
                 venta_final = costo_total + (costo_total * (p_venta / 100))
                 txt_venta_final.value = str(round(venta_final, 2))
             
             elif e.control == txt_venta_final:
+                venta_final = float(txt_venta_final.value or 0)
                 if costo_total > 0:
                     p_venta = ((venta_final - costo_total) / costo_total) * 100
                     txt_p_venta.value = str(round(p_venta, 2))
-                else:
-                    txt_p_venta.value = "0"
 
             page.update()
         except:
             pass
 
-    txt_costo_base = ft.TextField(label="Precio Costo", value="0", on_change=recalcular_precios, **estilo_campo)
+    def manejar_cambio_unidades(e):
+        try:
+            cajas = int(txt_cajas_recibidas.value if txt_cajas_recibidas.value else 0)
+            u_por_caja = int(txt_unidades_caja.value if txt_unidades_caja.value else 1)
+            txt_unidades_nuevas.value = str(cajas * u_por_caja)
+            
+            if txt_costo_por_caja.value and float(txt_costo_por_caja.value) > 0:
+                recalcular_precios(e)
+            page.update()
+        except:
+            pass
+
+    # --- CAMPOS ---
+    txt_unidades_caja = ft.TextField(label="Unidades por Caja", value="1", width=180, on_change=manejar_cambio_unidades, **estilo_campo)
+    txt_cajas_recibidas = ft.TextField(label="Cantidad de Cajas", value="0", width=180, on_change=manejar_cambio_unidades, **estilo_campo)
+    txt_unidades_nuevas = ft.TextField(label="Total Unidades a Cargar", value="0", read_only=True, width=220, bgcolor="#f0f0f0", **estilo_campo)
+
+    txt_costo_por_caja = ft.TextField(label="Costo por Caja ($)", on_change=recalcular_precios, bgcolor="#FFF3E0", **estilo_campo)
+    txt_costo_base = ft.TextField(label="Precio Costo Unit. ($)", value="0", on_change=recalcular_precios, **estilo_campo)
     txt_p_transporte = ft.TextField(label="% Transporte", value="0", on_change=recalcular_precios, **estilo_campo)
-    txt_costo_total = ft.TextField(label="Costo Total", value="0", on_change=recalcular_precios, bgcolor="#E8F5E9", **estilo_campo)
+    txt_costo_total = ft.TextField(label="Costo Total ($)", value="0", on_change=recalcular_precios, bgcolor="#E8F5E9", **estilo_campo)
     txt_p_venta = ft.TextField(label="% Ganancia Venta", value="0", on_change=recalcular_precios, **estilo_campo)
-    txt_venta_final = ft.TextField(label="Precio Venta Final", value="0", on_change=recalcular_precios, **estilo_campo)
+    txt_venta_final = ft.TextField(label="Precio Venta Final ($)", value="0", on_change=recalcular_precios, **estilo_campo)
     
     txt_marca = ft.TextField(label="Marca", **estilo_campo)
-
-    lista_resultados = ft.ListView(expand=True, spacing=10, padding=10)
+    
+    # Lista de resultados con scroll oculto
+    lista_resultados = ft.ListView(
+        expand=True, 
+        spacing=10, 
+        padding=10,
+        scroll=ft.ScrollMode.HIDDEN # Scroll funcional pero invisible
+    )
 
     def seleccionar_para_editar(prod):
         nonlocal producto_seleccionado_id
         producto_seleccionado_id = prod['id']
-        
         txt_codigo.value = str(prod['codigo_barra'] or "")
         txt_nombre.value = str(prod['nombre_producto'] or "")
         txt_unidades_caja.value = str(prod['unidades_por_caja'])
@@ -109,14 +117,12 @@ def agregar_producto_view(page: ft.Page):
         txt_costo_total.value = str(prod['precio_costo_total'])
         txt_p_venta.value = str(prod['porcentaje_venta'])
         txt_venta_final.value = str(prod['precio_venta'])
-        
-        txt_cajas_recibidas.value = "0"
-        txt_unidades_nuevas.value = "0"
         txt_marca.value = str(prod['marca_producto'] or "")
-        
-        # Asignar valor al Dropdown de categoría
         drop_categoria.value = str(prod['categoria']) if prod['categoria'] else None
         
+        txt_costo_por_caja.value = ""
+        txt_cajas_recibidas.value = "0"
+        txt_unidades_nuevas.value = "0"
         container_principal.content = layout_formulario
         page.update()
 
@@ -130,15 +136,10 @@ def agregar_producto_view(page: ft.Page):
                         content=ft.Row([
                             ft.Text(p['codigo_barra'], width=150, color="black", weight="bold"),
                             ft.Text(p['nombre_producto'], expand=True, color="black"),
-                            ft.ElevatedButton(
-                                "MODIFICAR", 
-                                bgcolor="#00897b", 
-                                color="white", 
-                                on_click=lambda _, p=p: seleccionar_para_editar(p)
-                            ),
-                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                        padding=10,
-                        border=ft.border.only(bottom=ft.border.BorderSide(1, "black12"))
+                            ft.ElevatedButton("MODIFICAR", bgcolor="#00897b", color="white", 
+                                             on_click=lambda _, p=p: seleccionar_para_editar(p)),
+                        ]),
+                        padding=10, border=ft.border.only(bottom=ft.border.BorderSide(1, "black12"))
                     )
                 )
         page.update()
@@ -152,17 +153,11 @@ def agregar_producto_view(page: ft.Page):
             return
         
         datos_db = (
-            txt_codigo.value, 
-            txt_nombre.value, 
-            int(txt_unidades_caja.value or 1),
-            float(txt_costo_base.value or 0), 
-            float(txt_p_transporte.value or 0),
-            float(txt_costo_total.value or 0), 
-            float(txt_p_venta.value or 0),
-            float(txt_venta_final.value or 0), 
-            int(txt_unidades_nuevas.value or 0),
-            txt_marca.value, 
-            drop_categoria.value # Usamos el valor del Dropdown
+            txt_codigo.value, txt_nombre.value, int(txt_unidades_caja.value or 1),
+            float(txt_costo_base.value or 0), float(txt_p_transporte.value or 0),
+            float(txt_costo_total.value or 0), float(txt_p_venta.value or 0),
+            float(txt_venta_final.value or 0), int(txt_unidades_nuevas.value or 0),
+            txt_marca.value, drop_categoria.value
         )
         
         if producto_seleccionado_id:
@@ -171,7 +166,7 @@ def agregar_producto_view(page: ft.Page):
             exito = insertar_producto((user_id,) + datos_db)
 
         if exito:
-            page.snack_bar = ft.SnackBar(ft.Text("¡Operación exitosa!"), bgcolor="#004d40")
+            page.snack_bar = ft.SnackBar(ft.Text("¡Producto guardado correctamente!"), bgcolor="#004d40")
             page.snack_bar.open = True
             volver_a_busqueda(None)
 
@@ -198,7 +193,7 @@ def agregar_producto_view(page: ft.Page):
             content=ft.Row([
                 ft.Text("CÓDIGO", width=150, color="black", weight="bold"),
                 ft.Text("NOMBRE DEL PRODUCTO", expand=True, color="black", weight="bold"),
-                ft.Text("ACCIÓN", width=100, color="black", weight="bold", text_align=ft.TextAlign.RIGHT),
+                ft.Text("ACCIÓN", width=100, color="black", weight="bold", text_align="right"),
             ]),
             padding=ft.padding.only(left=10, right=25)
         ),
@@ -208,41 +203,36 @@ def agregar_producto_view(page: ft.Page):
 
     layout_formulario = ft.Column([
         ft.Row([
-            ft.Text("DETALLES DE ENTRADA", size=22, weight="bold", color="black"),
+            ft.Text("DATOS DEL PRODUCTO", size=22, weight="bold", color="black"),
             ft.Container(expand=True),
             ft.ElevatedButton("CANCELAR", bgcolor="#c62828", color="white", on_click=volver_a_busqueda), 
         ]),
         ft.Divider(color="black12"),
         ft.Row([txt_codigo, txt_nombre]),
-        ft.Row([txt_marca, drop_categoria]), # Aquí se visualiza el nuevo Dropdown
+        ft.Row([txt_marca, drop_categoria]),
         
         ft.Container(
             content=ft.Column([
-                ft.Text("Gestión de Unidades y Cajas", weight="bold", color="#004d40", size=16),
+                ft.Text("Inventario", weight="bold", color="#004d40", size=16),
                 ft.Row([txt_unidades_caja, txt_cajas_recibidas, txt_unidades_nuevas], spacing=20),
             ]),
-            padding=10, bgcolor="#f9f9f9", border_radius=10
+            padding=15, bgcolor="#f9f9f9", border_radius=10
         ),
         
         ft.Container(
             content=ft.Column([
-                ft.Text("Costos y Ganancias", weight="bold", color="#004d40", size=16),
+                ft.Text("Precios y Costos", weight="bold", color="#004d40", size=16),
+                ft.Row([txt_costo_por_caja, ft.Text("← Use este campo si compró por caja", size=12, italic=True)]),
                 ft.Row([txt_costo_base, txt_p_transporte, txt_costo_total], spacing=20),
                 ft.Row([txt_p_venta, txt_venta_final], spacing=20),
             ]),
-            padding=10, bgcolor="#f9f9f9", border_radius=10
+            padding=15, bgcolor="#f9f9f9", border_radius=10
         ),
 
         ft.Row([
-            ft.ElevatedButton(
-                "GUARDAR PRODUCTO", 
-                bgcolor="#004d40", 
-                color="white", 
-                height=50, 
-                on_click=guardar_click
-            )
+            ft.ElevatedButton("GUARDAR PRODUCTO", bgcolor="#004d40", color="white", height=50, on_click=guardar_click)
         ], alignment=ft.MainAxisAlignment.END)
-    ], spacing=15, scroll=ft.ScrollMode.ALWAYS)
+    ], spacing=15, expand=True, scroll=ft.ScrollMode.HIDDEN) # Scroll principal invisible
 
     container_principal = ft.Container(content=layout_busqueda, expand=True)
     
