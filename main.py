@@ -6,6 +6,8 @@ from views.agregar_producto_view import agregar_producto_view
 from views.inventario_view import inventario_view
 from views.factura_view import factura_view
 from views.historial_view import historial_view
+# 1. IMPORTAR LA NUEVA VISTA DE FINANZAS
+from views.finanzas_view import finanzas_view 
 
 async def main(page: ft.Page):
     page.window.maximized = True
@@ -14,13 +16,10 @@ async def main(page: ft.Page):
     page.padding = 0
     page.spacing = 0
 
-    # Inicializar la base de datos al arrancar
     inicializar_db()
 
-    # Variable para rastrear la sección activa
     page.selected_menu = "Agregar Producto"
 
-    # Contenedor dinámico principal
     content_area = ft.Container(
         expand=True,
         padding=20,
@@ -50,9 +49,11 @@ async def main(page: ft.Page):
             content_area.content = inventario_view(page)
         elif nombre_seccion == "Crear Factura":
             content_area.content = factura_view(page)
-        # 2. Agregamos la condición para el Historial
         elif nombre_seccion == "Historial":
             content_area.content = historial_view(page)
+        # 2. AGREGAR LA CONDICIÓN PARA FINANZAS
+        elif nombre_seccion == "Finanzas":
+            content_area.content = finanzas_view(page)
         else:
             content_area.content = ft.Column([
                 ft.Text(nombre_seccion, size=28, weight="bold", color="#00332a"),
@@ -78,7 +79,7 @@ async def main(page: ft.Page):
     rail = ft.Column(spacing=0)
 
     def actualizar_sidebar():
-        # Aquí definimos el orden de los botones del menú lateral
+        # 3. ASEGURAR QUE "Finanzas" ESTÉ EN LA LISTA
         secciones = ["Agregar Producto", "Inventario", "Crear Factura", "Historial", "Finanzas"]
         rail.controls = [build_menu_button(s) for s in secciones]
 
@@ -120,7 +121,6 @@ async def main(page: ft.Page):
             spacing=0,
         )
 
-        # Cargar la vista por defecto
         content_area.content = agregar_producto_view(page)
         
         page.add(app_bar, layout)
