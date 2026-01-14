@@ -2,14 +2,13 @@ import os
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
+from reportlab.lib.utils import simpleSplit # Importante para dividir el texto
 
 def generar_factura_pdf(res, carrito):
-    # --- CONFIGURACIÓN DE CARPETA DE DESTINO ---
     carpeta_destino = "facturas_generadas"
     if not os.path.exists(carpeta_destino):
         os.makedirs(carpeta_destino)
     
-    # --- LÓGICA DE NÚMERO DE 8 DÍGITOS ---
     try:
         if isinstance(res['numero_factura'], str) and "-" in res['numero_factura']:
             num_solo = res['numero_factura'].split('-')[-1]
@@ -26,7 +25,7 @@ def generar_factura_pdf(res, carrito):
     width, height = letter
     COLOR_APP = (0/255, 77/255, 64/255)
 
-    # --- ENCABEZADO ---
+    # --- ENCABEZADO --- (Sin cambios)
     c.setFont("Helvetica-Bold", 16)
     c.drawString(40, height - 50, "Inversiones y suministro")
     c.setFont("Helvetica-Bold", 18)
@@ -73,20 +72,37 @@ def generar_factura_pdf(res, carrito):
     y = y_table - 30
     c.setFont("Helvetica", 10)
     
+    # Ancho máximo para la columna de producto (aprox hasta llegar a 'Cant.')
+    ancho_max_nombre = 220 
+
     for item in carrito:
-        c.drawString(45, y, str(item['nombre']).upper())
-        c.drawCentredString(300, y, str(item['cantidad']))
+        # 1. Dividir el nombre en líneas que quepan en el ancho
+        nombre_prod = str(item['nombre']).upper()
+        lineas_nombre = simpleSplit(nombre_prod, "Helvetica", 10, ancho_max_nombre)
         
-        # AJUSTE AQUÍ: Muestra exactamente lo que viene del carrito ("Unid." o "Caja")
-        # en mayúsculas para estética del PDF
+        # Guardamos la 'y' inicial para las otras columnas
+        y_inicio_fila = y 
+
+        # 2. Dibujar cada línea del nombre
+        for linea in lineas_nombre:
+            c.drawString(45, y, linea)
+            y -= 12 # Espaciado entre líneas del nombre
+
+        # 3. Dibujar el resto de columnas (alineadas con la primera línea del nombre)
+        y_resto = y_inicio_fila
+        c.drawCentredString(300, y_resto, str(item['cantidad']))
         tipo_empaque = str(item.get('tipo', 'UNID')).upper()
-        c.drawCentredString(365, y, tipo_empaque)
+        c.drawCentredString(365, y_resto, tipo_empaque)
         
         precio_val = item.get('precio_unitario', 0)
-        c.drawCentredString(460, y, f"{precio_val:,.2f}$")
-        c.drawCentredString(540, y, f"{item['subtotal']:,.2f}$")
+        c.drawCentredString(460, y_resto, f"{precio_val:,.2f}$")
+        c.drawCentredString(540, y_resto, f"{item['subtotal']:,.2f}$")
         
-        y -= 20
+        # 4. Preparar la 'y' para el siguiente producto
+        # Si el nombre ocupó varias líneas, dejamos un espacio extra
+        y = min(y, y_resto - 15) - 5 
+
+        # Salto de página si se acaba el espacio
         if y < 110: 
             c.showPage()
             y = height - 50

@@ -1,5 +1,7 @@
 import flet as ft
-from data.database import buscar_productos, buscar_cliente_por_rif, guardar_factura_completa
+from data.productos import buscar_productos
+from data.clientes import buscar_cliente_por_rif
+from data.facturas import guardar_factura_completa
 from services.pdf_service import generar_factura_pdf
 from services.email_service import enviar_factura_email
 import os
@@ -118,55 +120,93 @@ def factura_view(page: ft.Page):
 
     def buscar_p(e):
         resultados_busqueda.controls.clear()
-        if len(txt_busca_prod.value) >= 1:
-            prods = buscar_productos(user_id, txt_busca_prod.value)
-            for p in prods:
-                p_dict = dict(p)
-                en_carrito = sum(it['unidades_totales'] for it in carrito if it['id'] == p_dict['id'])
-                cant_input = ft.TextField(value="1", width=60, dense=True, text_align="center", color="black", border_color=COLOR_PRIMARIO)
-                
-                # Texto de stock en NEGRO
-                txt_stock_item = ft.Text(f"Stock: {p_dict['cantidad_unidades'] - en_carrito} | Precio: {p_dict['precio_venta']}$", size=12, color="black")
-                controles_stock_visibles[p_dict['id']] = (txt_stock_item, p_dict)
+        termino = txt_busca_prod.value.strip()
 
-                # Radio con etiquetas en NEGRO
-                opcion_empaque = ft.RadioGroup(
-                    content=ft.Row([
-                        ft.Radio(value="und", label="UND", fill_color=COLOR_PRIMARIO, label_style=ft.TextStyle(color="black")),
-                        ft.Radio(value="caja", label="CAJA", fill_color=COLOR_PRIMARIO, label_style=ft.TextStyle(color="black")),
-                    ], spacing=10), value="und"
+        if not termino:
+            resultados_busqueda.controls.append(
+                ft.Container(
+                    content=ft.Column([
+                        ft.Text("( ? )", size=30, weight="bold", color="#BDBDBD"),
+                        ft.Text("Busca un producto para añadir...", color="#9E9E9E", size=14)
+                    ], horizontal_alignment=ft.CrossAxisAlignment.CENTER), padding=20
                 )
-                
+            )
+        else:
+            prods = buscar_productos(user_id, termino)
+            if not prods:
                 resultados_busqueda.controls.append(
                     ft.Container(
-                        content=ft.Row([
-                            ft.Column([ft.Text(p_dict['nombre_producto'], weight="bold", color="black", size=15), txt_stock_item], expand=True),
-                            opcion_empaque, cant_input,
-                            ft.TextButton("Añadir", on_click=lambda _, p=p_dict, c=cant_input, t=opcion_empaque: agregar_al_carrito(p, c, t), style=ft.ButtonStyle(color=COLOR_PRIMARIO))
-                        ]), padding=10, border=ft.border.only(bottom=ft.border.BorderSide(1, "black12")), bgcolor="#FFFFFF"
+                        content=ft.Column([
+                            ft.Text("( ! )", size=30, weight="bold", color="#BDBDBD"),
+                            ft.Text("No se encontraron coincidencias.", color="#9E9E9E", size=14)
+                        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER), padding=20
                     )
                 )
+            else:
+                for p in prods:
+                    p_dict = dict(p)
+                    en_carrito = sum(it['unidades_totales'] for it in carrito if it['id'] == p_dict['id'])
+                    cant_input = ft.TextField(value="1", width=60, dense=True, text_align="center", color="black", border_color=COLOR_PRIMARIO)
+                    txt_stock_item = ft.Text(f"Stock: {p_dict['cantidad_unidades'] - en_carrito} | Precio: {p_dict['precio_venta']}$", size=12, color="black")
+                    controles_stock_visibles[p_dict['id']] = (txt_stock_item, p_dict)
+                    opcion_empaque = ft.RadioGroup(
+                        content=ft.Row([
+                            ft.Radio(value="und", label="UND", fill_color=COLOR_PRIMARIO, label_style=ft.TextStyle(color="black")),
+                            ft.Radio(value="caja", label="CAJA", fill_color=COLOR_PRIMARIO, label_style=ft.TextStyle(color="black")),
+                        ], spacing=10), value="und"
+                    )
+                    resultados_busqueda.controls.append(
+                        ft.Container(
+                            content=ft.Row([
+                                ft.Column([ft.Text(p_dict['nombre_producto'], weight="bold", color="black", size=15), txt_stock_item], expand=True),
+                                opcion_empaque, cant_input,
+                                ft.TextButton("Añadir", on_click=lambda _, p=p_dict, c=cant_input, t=opcion_empaque: agregar_al_carrito(p, c, t), style=ft.ButtonStyle(color=COLOR_PRIMARIO))
+                            ]), padding=10, border=ft.border.only(bottom=ft.border.BorderSide(1, "black12")), bgcolor="#FFFFFF"
+                        )
+                    )
         page.update()
 
-    # --- BÚSQUEDA CLIENTES (Estilo Gestor de Productos) ---
-    lista_clientes = ft.ListView(expand=True, spacing=10, scroll=ft.ScrollMode.HIDDEN)
+    # --- BÚSQUEDA CLIENTES ---
+    lista_clientes = ft.ListView(expand=True, spacing=0)
+    # CORRECCIÓN: Se quitó bgcolor="white" porque ya viene en estilo_campo
     txt_busca_cliente = ft.TextField(label="Buscar cliente...", on_change=lambda e: realizar_busqueda_cliente(e), expand=True, **estilo_campo)
 
     def realizar_busqueda_cliente(e):
         lista_clientes.controls.clear()
-        if len(txt_busca_cliente.value) >= 1:
-            clientes = buscar_cliente_por_rif(user_id, txt_busca_cliente.value)
-            for c in clientes:
+        termino = txt_busca_cliente.value.strip()
+
+        if not termino:
+            lista_clientes.controls.append(
+                ft.Container(
+                    content=ft.Column([
+                        ft.Text("( ? )", size=40, weight="bold", color="#BDBDBD"),
+                        ft.Text("Busca un cliente para comenzar...", color="#9E9E9E", size=16)
+                    ], horizontal_alignment=ft.CrossAxisAlignment.CENTER), margin=ft.margin.only(top=40)
+                )
+            )
+        else:
+            clientes = buscar_cliente_por_rif(user_id, termino)
+            if not clientes:
                 lista_clientes.controls.append(
                     ft.Container(
-                        content=ft.Row([
-                            ft.Text(c['cedula_rif'], width=150, color="black", weight="bold"),
-                            ft.Text(c['nombre_razon'], expand=True, color="black"),
-                            ft.ElevatedButton("CREAR", bgcolor="#00897b", color="white", 
-                                             on_click=lambda _, cli=c: iniciar_factura_con_cliente(cli)),
-                        ]), padding=10, border=ft.border.only(bottom=ft.border.BorderSide(1, "black12"))
+                        content=ft.Column([
+                            ft.Text("( ! )", size=40, weight="bold", color="#BDBDBD"),
+                            ft.Text("No se encontraron resultados.", color="#9E9E9E", size=16)
+                        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER), margin=ft.margin.only(top=40)
                     )
                 )
+            else:
+                for c in clientes:
+                    lista_clientes.controls.append(
+                        ft.Container(
+                            content=ft.Row([
+                                ft.Text(c['cedula_rif'], width=150, color="black", weight="bold"),
+                                ft.Text(c['nombre_razon'], expand=True, color="black"),
+                                ft.ElevatedButton("CREAR NOTA", bgcolor="#00897b", color="white", 
+                                                 on_click=lambda _, cli=c: iniciar_factura_con_cliente(cli)),
+                            ]), padding=ft.padding.symmetric(vertical=8, horizontal=15), border=ft.border.only(bottom=ft.border.BorderSide(1, "#EEEEEE"))
+                        )
+                    )
         page.update()
 
     def iniciar_factura_con_cliente(cliente=None):
@@ -177,12 +217,15 @@ def factura_view(page: ft.Page):
             txt_cliente_email.value = c.get('email', "") or ""
         else:
             txt_cliente_id.value = ""; txt_cliente_nombre.value = ""; txt_cliente_dir.value = ""; txt_cliente_zona.value = ""; txt_cliente_email.value = ""
+        
+        buscar_p(None) 
         container_principal.content = layout_formulario
         page.update()
 
     def volver_a_lista_clientes(e):
         carrito.clear(); actualizar_tabla()
-        txt_busca_cliente.value = ""; lista_clientes.controls.clear()
+        txt_busca_cliente.value = ""
+        realizar_busqueda_cliente(None)
         container_principal.content = layout_seleccion_cliente
         page.update()
 
@@ -203,25 +246,36 @@ def factura_view(page: ft.Page):
                 if datos_cliente["email"] and "@" in datos_cliente["email"]:
                     ruta_pdf = os.path.join("facturas_generadas", f"Nota_{res['numero_factura']}.pdf")
                     enviar_factura_email(datos_cliente["email"], res['numero_factura'], ruta_pdf)
-                mostrar_mensaje("¡Venta Exitosa!", color="#2e7d32")
+                mostrar_mensaje("¡Venta Exitosa!", color="#004d40")
                 volver_a_lista_clientes(None)
             else: mostrar_mensaje(f"Error DB: {res.get('error')}")
         except Exception as ex: mostrar_mensaje(f"Error: {ex}")
 
-    # --- LAYOUTS ---
+    # --- LAYOUTS (SISTEMA DE DOS CONTENEDORES) ---
     layout_seleccion_cliente = ft.Column([
-        ft.Row([txt_busca_cliente, ft.ElevatedButton("NUEVO CLIENTE", bgcolor=COLOR_PRIMARIO, color="white", height=50, on_click=lambda _: iniciar_factura_con_cliente(None))]),
+        # Contenedor 1: Barra de búsqueda elevada
         ft.Container(
             content=ft.Row([
-                ft.Text("RIF / CÉDULA", width=150, color="black", weight="bold"),
-                ft.Text("NOMBRE O RAZÓN SOCIAL", expand=True, color="black", weight="bold"),
-                ft.Text("ACCIÓN", width=100, color="black", weight="bold", text_align="right"),
+                txt_busca_cliente, 
+                ft.ElevatedButton("NUEVO CLIENTE", bgcolor=COLOR_PRIMARIO, color="white", height=50, on_click=lambda _: iniciar_factura_con_cliente(None))
             ]),
-            padding=ft.padding.only(left=10, right=25)
+            bgcolor="white", padding=20, border_radius=15,
+            shadow=ft.BoxShadow(spread_radius=1, blur_radius=12, color="#22000000", offset=ft.Offset(0, 4))
         ),
-        ft.Divider(color="black12"),
-        lista_clientes
-    ], expand=True)
+        # Contenedor 2: Lista de resultados con bordes
+        ft.Container(
+            content=ft.Column([
+                ft.Container(content=ft.Row([
+                    ft.Text("RIF / CÉDULA", width=150, color=COLOR_PRIMARIO, weight="bold"),
+                    ft.Text("NOMBRE O RAZÓN SOCIAL", expand=True, color=COLOR_PRIMARIO, weight="bold"),
+                    ft.Text("ACCIÓN", width=120, color=COLOR_PRIMARIO, weight="bold", text_align="center"),
+                ]), padding=ft.padding.only(left=15, right=15, top=20, bottom=10)),
+                ft.Divider(height=1, color="#EEEEEE"),
+                lista_clientes
+            ], spacing=0),
+            bgcolor="white", border_radius=15, expand=True, border=ft.border.all(1, "#E0E0E0")
+        )
+    ], expand=True, spacing=15)
 
     layout_formulario = ft.Row([
         ft.Column([
@@ -249,9 +303,11 @@ def factura_view(page: ft.Page):
         ], expand=1)
     ], spacing=25, expand=True)
 
+    realizar_busqueda_cliente(None)
     container_principal = ft.Container(content=layout_seleccion_cliente, expand=True)
+    
     return ft.Column([
-        ft.Text("GENERAR NOTA DE ENTREGA", size=28, weight="bold", color="#00332a"), 
+        ft.Text("Gestor de Facturas", size=24, weight="bold", color="#00332a"), 
         ft.Divider(color="#00332a", height=2), 
         container_principal
-    ], spacing=20, expand=True)
+    ], spacing=15, expand=True)

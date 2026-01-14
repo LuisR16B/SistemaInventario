@@ -4,9 +4,8 @@ from data.database import inicializar_db
 from views.login_view import login_view
 from views.agregar_producto_view import agregar_producto_view
 from views.inventario_view import inventario_view
-from views.factura_view import factura_view 
-# 1. Importamos la nueva vista de historial
-from views.historial_view import historial_view 
+from views.factura_view import factura_view
+from views.historial_view import historial_view
 
 async def main(page: ft.Page):
     page.window.maximized = True
@@ -24,7 +23,7 @@ async def main(page: ft.Page):
     # Contenedor dinámico principal
     content_area = ft.Container(
         expand=True,
-        padding=30,
+        padding=20,
         bgcolor="#F4F6F7",
         content=ft.Text("Cargando módulo...", color="black")
     )
